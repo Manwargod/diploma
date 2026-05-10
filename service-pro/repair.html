@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ServicePro - Ремонт</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-[#0a0a0c] text-white min-h-screen flex flex-col" id="appBody">
+    
+    <header id="mainHeader" class="sticky top-0 z-[100] border-b bg-black/50 border-white/10 backdrop-blur-xl px-6 py-4 flex items-center justify-between">
+        <a href="index.html" class="flex items-center gap-4">
+            <div class="w-10 h-10 bg-[#00f2ff] rounded-xl flex items-center justify-center text-black shadow-[0_0_20px_rgba(0,242,255,0.3)]">
+                <i data-lucide="settings" class="w-[22px] h-[22px]"></i>
+            </div>
+            <span class="text-xl font-black tracking-tighter italic uppercase">SERVICETAP.KZ</span>
+        </a>
+        <nav class="hidden lg:flex items-center gap-8">
+            <a href="index.html" class="text-sm font-black uppercase hover:text-[#00f2ff] transition-all">Главная</a>
+            <a href="repair.html" class="text-sm font-black uppercase text-[#00f2ff]">Ремонт</a>
+            <a href="builder.html" class="text-sm font-black uppercase hover:text-[#00f2ff] transition-all">Сборка</a>
+            <a href="market.html" class="text-sm font-black uppercase hover:text-[#00f2ff] transition-all">Маркет</a>
+        </nav>
+        <div class="flex items-center gap-2">
+            <a href="dashboard.html" class="p-2.5 rounded-full bg-white/5 border border-white/10"><i data-lucide="user" class="w-[18px] h-[18px]"></i></a>
+            <button onclick="toggleTheme()" class="p-2.5 rounded-full hover:bg-white/5"><i data-lucide="sun" class="w-[18px] h-[18px]" id="themeIcon"></i></button>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-5xl mx-auto px-6 py-20 w-full">
+        <div id="repairBox" class="theme-box relative rounded-[3rem] border bg-[#0f0f12] border-white/5 p-8 transition-all duration-700">
+            
+            <div class="flex flex-col md:flex-row items-center justify-between gap-6 mb-12">
+                <div class="flex items-center gap-6">
+                    <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#00f2ff] to-[#7000ff] flex items-center justify-center text-white"><i data-lucide="smartphone" class="w-8 h-8"></i></div>
+                    <div>
+                        <h2 class="text-3xl font-black italic uppercase tracking-tighter">Оформление ремонта</h2>
+                        <p class="text-gray-500 text-[10px] font-bold uppercase">Шаг 1: Данные и логистика</p>
+                    </div>
+                </div>
+                <button id="startRepairBtn" onclick="expandRepairForm()" class="px-10 py-5 bg-[#00f2ff] text-black font-black rounded-2xl hover:scale-105 transition-all uppercase italic">Начать</button>
+            </div>
+
+            <div id="repairFormContainer" class="max-h-0 opacity-0 overflow-hidden transition-all duration-700">
+                <div id="repairStep1" class="space-y-12">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-black uppercase opacity-40 ml-4">Имя</label>
+                            <input type="text" value="Нурсултан" readonly class="w-full p-5 rounded-2xl bg-white/5 border border-white/5 font-bold outline-none" />
+                        </div>
+                        <div class="space-y-2">
+                            <label class="text-[10px] font-black uppercase opacity-40 ml-4">Адрес забора</label>
+                            <input type="text" id="repairAddress" oninput="checkRepairAddress()" placeholder="Ваш адрес в Алматы..." class="w-full p-5 rounded-2xl bg-white/5 border border-red-500/30 font-bold outline-none focus:border-[#00f2ff] transition-all" />
+                        </div>
+                    </div>
+
+                    <div class="pt-12 border-t border-white/5">
+                        <label class="flex items-center gap-4 cursor-pointer mb-8">
+                            <input type="checkbox" id="manualSC" onchange="toggleSCList()" class="w-5 h-5 accent-[#00f2ff]" />
+                            <span class="text-sm font-black uppercase italic">Выбрать сервис самостоятельно</span>
+                        </label>
+                        <div id="scList" class="hidden grid-cols-1 md:grid-cols-3 gap-4"></div>
+                    </div>
+
+                    <button id="confirmRepairStep1" onclick="finishRepairStep1()" disabled class="w-full py-6 bg-gradient-to-r from-[#00f2ff] to-[#7000ff] text-black font-black rounded-3xl opacity-30 cursor-not-allowed transition-all uppercase italic">Подтвердить данные</button>
+                </div>
+
+                <div id="repairStep2" class="hidden animate-in slide-in-from-bottom-10 duration-700 space-y-12">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
+                        <div class="space-y-6">
+                            <h3 class="text-xl font-black italic uppercase text-[#00f2ff]">Доставка</h3>
+                            <button class="w-full p-6 rounded-3xl border border-[#00f2ff] bg-[#00f2ff]/10 flex items-center gap-4">
+                                <i data-lucide="truck"></i> <span class="font-black uppercase text-sm">Курьер ServicePro</span>
+                            </button>
+                        </div>
+                        <div class="space-y-6">
+                            <h3 class="text-xl font-black italic uppercase text-[#7000ff]">Оплата</h3>
+                            <button class="w-full p-6 rounded-3xl border border-[#7000ff] bg-[#7000ff]/10 flex items-center justify-center gap-4">
+                                <i data-lucide="qr-code"></i> <span class="font-black uppercase text-sm">Kaspi QR</span>
+                            </button>
+                        </div>
+                    </div>
+                    <button onclick="window.location.href='dashboard.html'" class="w-full py-6 bg-white text-black font-black rounded-3xl uppercase italic">Оплатить и создать заказ</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+    <script>
+        // Доп. функции для этой страницы (можно перенести в app.js)
+        function expandRepairForm() {
+            document.getElementById('startRepairBtn').classList.add('hidden');
+            document.getElementById('repairFormContainer').classList.replace('max-h-0', 'max-h-[2000px]');
+            document.getElementById('repairFormContainer').classList.replace('opacity-0', 'opacity-100');
+        }
+        function checkRepairAddress() {
+            const val = document.getElementById('repairAddress').value;
+            const btn = document.getElementById('confirmRepairStep1');
+            if (val.length > 5) {
+                btn.removeAttribute('disabled');
+                btn.classList.remove('opacity-30', 'cursor-not-allowed');
+            } else {
+                btn.setAttribute('disabled', 'true');
+                btn.classList.add('opacity-30', 'cursor-not-allowed');
+            }
+        }
+        function toggleSCList() {
+            const list = document.getElementById('scList');
+            list.classList.toggle('hidden');
+            list.classList.toggle('grid');
+        }
+        function renderServiceCenters() {
+            const scs = [
+                { id: 1, name: "ServicePro Mega", addr: "Розыбакиева 247" },
+                { id: 2, name: "ServicePro Keruen", addr: "Достык 9" }
+            ];
+            document.getElementById('scList').innerHTML = scs.map(s => `
+                <div class="p-4 rounded-xl border border-white/10 bg-white/5">
+                    <div class="text-[10px] font-black uppercase text-[#00f2ff]">${s.name}</div>
+                    <div class="text-[9px] opacity-40 uppercase">${s.addr}</div>
+                </div>
+            `).join('');
+        }
+        function finishRepairStep1() {
+            document.getElementById('repairStep1').classList.add('hidden');
+            document.getElementById('repairStep2').classList.remove('hidden');
+        }
+        renderServiceCenters();
+    </script>
+</body>
+</html>

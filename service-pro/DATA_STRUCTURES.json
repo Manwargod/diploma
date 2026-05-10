@@ -1,0 +1,25 @@
+{
+  "cartState": {
+    "itemCount": 3,
+    "subtotal": 1420000,
+    "tax": 113600,
+    "discount": 142000,
+    "total": 1391600,
+    "promoCode": "DISCOUNT10"
+  },
+  "deliveryData": {
+    "fullName": "Иван Иванов",
+    "phone": "+77123456789",
+    "email": "ivan@example.com",
+    "city": "Almaty",
+    "address": "ул. Абая, д. 123, кв. 45",
+    "deliveryMethod": "courier"
+  },
+  "promoCodes": {
+    "DISCOUNT10": 10,
+    "DISCOUNT20": 20,
+    "WELCOME": 15,
+    "SUMMER2024": 25,
+    "KASPI": 5
+  }
+}
