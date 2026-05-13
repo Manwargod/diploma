@@ -1,0 +1,12 @@
+{
+  "dependencies": {
+    "firebase": "^12.13.0",
+    "i18next": "^26.0.10",
+    "i18next-browser-languagedetector": "^8.2.1",
+    "jspdf": "^4.2.1",
+    "qrcode": "^1.5.4",
+    "react-i18next": "^17.0.7",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
+  }
+}

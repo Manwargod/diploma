@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { CreditCard, Lock } from 'lucide-react';
+import ConsentGate from '../ConsentGate';
 
-const BankCardPayment = ({ isDark, amount, onPaymentSuccess, onPaymentError }) => {
+const BankCardPayment = ({ isDark, amount, onPaymentSuccess, onPaymentError, consentChecked, onConsentChange }) => {
+  const { t } = useTranslation();
   const [isProcessing, setIsProcessing] = useState(false);
   const [cardData, setCardData] = useState({
     number: '',
@@ -41,17 +44,17 @@ const BankCardPayment = ({ isDark, amount, onPaymentSuccess, onPaymentError }) =
     // Проверка номера карты (должен быть 16 цифр)
     const cardNumber = cardData.number.replace(/\s+/g, '');
     if (cardNumber.length !== 16) {
-      newErrors.number = 'Номер карты должен содержать 16 цифр';
+      newErrors.number = t('validation.numeric');
     }
 
     // Проверка имени держателя
     if (!cardData.holder.trim()) {
-      newErrors.holder = 'Укажите имя держателя карты';
+      newErrors.holder = t('validation.required');
     }
 
     // Проверка срока действия
     if (!cardData.expiry.match(/^\d{2}\/\d{2}$/)) {
-      newErrors.expiry = 'Укажите срок в формате MM/YY';
+      newErrors.expiry = t('validation.required');
     } else {
       const [month, year] = cardData.expiry.split('/');
       const currentDate = new Date();
@@ -62,13 +65,13 @@ const BankCardPayment = ({ isDark, amount, onPaymentSuccess, onPaymentError }) =
       const cardYear = parseInt(year);
 
       if (cardYear < currentYear || (cardYear === currentYear && cardMonth < currentMonth)) {
-        newErrors.expiry = 'Срок действия карты истёк';
+        newErrors.expiry = t('validation.required');
       }
     }
 
     // Проверка CVV
     if (!cardData.cvv.match(/^\d{3}$/)) {
-      newErrors.cvv = 'CVV должен содержать 3 цифры';
+      newErrors.cvv = t('validation.numeric');
     }
 
     setErrors(newErrors);
@@ -160,18 +163,20 @@ const BankCardPayment = ({ isDark, amount, onPaymentSuccess, onPaymentError }) =
             <CreditCard size={24} />
           </div>
           <div>
-            <h3 className="font-black text-lg">Платёж банковской картой</h3>
-            <p className={`text-sm ${isDark ? 'text-white/50' : 'text-black/50'}`}>
-              Безопасно и быстро
-            </p>
+            <h3 className="font-black text-lg">Bank card</h3>
+            <p className={`text-sm ${isDark ? 'text-white/50' : 'text-black/50'}`}>Secure payment</p>
           </div>
         </div>
 
         {/* Amount */}
         <div className={`p-4 rounded-lg ${isDark ? 'bg-white/5' : 'bg-black/5'}`}>
           <p className={`text-sm ${isDark ? 'text-white/70' : 'text-black/70'}`}>
-            Сумма к оплате: <span className="font-black text-purple-500">{amount.toLocaleString('ru-RU')} ₸</span>
+            {t('market.price')}: <span className="font-black text-purple-500">{amount.toLocaleString('ru-RU')} ₸</span>
           </p>
+        </div>
+
+        <div className={`p-3 rounded-lg border ${isDark ? 'border-amber-500/30 bg-amber-500/10 text-amber-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-600'}`}>
+          <p className="text-xs font-bold">{t('payments.sandboxNotice')}</p>
         </div>
 
         {/* Form */}
@@ -179,7 +184,7 @@ const BankCardPayment = ({ isDark, amount, onPaymentSuccess, onPaymentError }) =
           {/* Card Number */}
           <div>
             <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-white/70' : 'text-black/70'}`}>
-              Номер карты
+              Card number
             </label>
             <input
               type="text"
@@ -204,7 +209,7 @@ const BankCardPayment = ({ isDark, amount, onPaymentSuccess, onPaymentError }) =
           {/* Holder Name */}
           <div>
             <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-white/70' : 'text-black/70'}`}>
-              Имя держателя
+              Cardholder name
             </label>
             <input
               type="text"
@@ -224,7 +229,7 @@ const BankCardPayment = ({ isDark, amount, onPaymentSuccess, onPaymentError }) =
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-white/70' : 'text-black/70'}`}>
-                Срок действия
+                Expiry
               </label>
               <input
                 type="text"
@@ -243,7 +248,7 @@ const BankCardPayment = ({ isDark, amount, onPaymentSuccess, onPaymentError }) =
 
             <div>
               <label className={`block text-sm font-bold mb-2 ${isDark ? 'text-white/70' : 'text-black/70'}`}>
-                CVV/CVC
+                CVV
               </label>
               <input
                 type="password"
@@ -261,18 +266,29 @@ const BankCardPayment = ({ isDark, amount, onPaymentSuccess, onPaymentError }) =
             </div>
           </div>
 
+          <ConsentGate
+            checked={consentChecked}
+            onChange={onConsentChange}
+            text={t('checkout.consent')}
+            policyLabel={t('common.privacyPolicy')}
+            policyUrl={process.env.REACT_APP_PRIVACY_POLICY_URL}
+            isDark={isDark}
+          />
+
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={isProcessing}
+            disabled={isProcessing || !consentChecked}
             className={`w-full py-3 rounded-xl font-black transition-all flex items-center justify-center gap-2 ${
               isProcessing
                 ? `${isDark ? 'bg-white/10' : 'bg-black/10'} opacity-50 cursor-not-allowed`
+                : !consentChecked
+                ? `${isDark ? 'bg-white/10' : 'bg-black/10'} text-white/40 cursor-not-allowed`
                 : 'bg-gradient-to-r from-purple-400 to-purple-600 text-white hover:scale-105'
             }`}
           >
             <Lock size={20} />
-            {isProcessing ? 'Обрабатываем платёж...' : 'Оплатить'}
+            {isProcessing ? t('common.loading') : t('common.submit')}
           </button>
         </form>
 
@@ -281,15 +297,11 @@ const BankCardPayment = ({ isDark, amount, onPaymentSuccess, onPaymentError }) =
           isDark ? 'bg-green-500/10 border border-green-500/30' : 'bg-green-500/5 border border-green-500/20'
         }`}>
           <Lock size={16} className="text-green-500 flex-shrink-0" />
-          <p className={`text-xs ${isDark ? 'text-green-400' : 'text-green-600'}`}>
-            Все платежи зашифрованы и обработаны с использованием PCI DSS стандартов
-          </p>
+          <p className={`text-xs ${isDark ? 'text-green-400' : 'text-green-600'}`}>{t('payments.noCardStorage')}</p>
         </div>
 
         {/* Info */}
-        <p className={`text-xs ${isDark ? 'text-white/40' : 'text-black/40'}`}>
-          Тестовые номера карт: 4111 1111 1111 1111 (Visa), 5555 5555 5555 4444 (Mastercard)
-        </p>
+        <p className={`text-xs ${isDark ? 'text-white/40' : 'text-black/40'}`}>Test cards: 4111 1111 1111 1111, 5555 5555 5555 4444</p>
       </div>
     </div>
   );

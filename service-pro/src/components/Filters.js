@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronDown, DollarSign, Tag, Star } from 'lucide-react';
 
-const Filters = ({ isDark, onFilterChange, t }) => {
+const Filters = ({ isDark, onFilterChange }) => {
+  const { t } = useTranslation();
   const [openFilter, setOpenFilter] = useState(null);
   const [priceRange, setPriceRange] = useState([0, 1500000]);
   const [selectedBrands, setSelectedBrands] = useState([]);
@@ -47,21 +49,21 @@ const Filters = ({ isDark, onFilterChange, t }) => {
   );
 
   return (
-    <div className={`rounded-[2.5rem] border ${isDark ? 'bg-[#0f0f12] border-white/5' : 'bg-white border-black/5'} overflow-hidden`}>
-      <div className={`p-4 font-black uppercase text-lg flex items-center gap-2 ${isDark ? 'bg-white/5' : 'bg-black/2'} border-b ${isDark ? 'border-white/5' : 'border-black/5'}`}>
+    <div className={`rounded-[2.5rem] border ${isDark ? 'bg-[#0f0f12] border-white/5' : 'bg-white border-black/10'} overflow-hidden`}>
+      <div className={`p-4 font-black uppercase text-lg flex items-center gap-2 ${isDark ? 'bg-white/5' : 'bg-black/5'} border-b ${isDark ? 'border-white/5' : 'border-black/10'}`}>
         <svg className="w-5 h-5 text-[#00f2ff]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <line x1="4" y1="6" x2="20" y2="6"></line>
           <line x1="4" y1="12" x2="20" y2="12"></line>
           <line x1="4" y1="18" x2="20" y2="18"></line>
         </svg>
-        Фильтры
+        {t('filters.title')}
       </div>
 
-      <FilterSection title="Цена">
+      <FilterSection title={t('filters.price')}>
         <div className="space-y-3">
           <div className="flex items-center gap-2 mb-2">
             <DollarSign size={16} className="text-[#00f2ff]" />
-            <span className="text-xs font-bold opacity-70">Диапазон цены</span>
+            <span className="text-xs font-bold opacity-70">{t('market.price')}</span>
           </div>
           <input
             type="range"
@@ -79,7 +81,7 @@ const Filters = ({ isDark, onFilterChange, t }) => {
         </div>
       </FilterSection>
 
-      <FilterSection title="Бренд">
+      <FilterSection title={t('filters.brand')}>
         <div className="space-y-2">
           {brands.map(brand => (
             <label key={brand} className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
@@ -96,7 +98,7 @@ const Filters = ({ isDark, onFilterChange, t }) => {
         </div>
       </FilterSection>
 
-      <FilterSection title="Рейтинг">
+      <FilterSection title={t('filters.rating')}>
         <div className="space-y-2">
           {ratings.map(rating => (
             <button

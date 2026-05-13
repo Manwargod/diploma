@@ -22,10 +22,13 @@ export const CartProvider = ({ children }) => {
   // Загрузка корзины из localStorage при монтировании
   useEffect(() => {
     const savedCart = localStorage.getItem('cart');
+    const serverCart = localStorage.getItem('sp_cart_server');
     const savedPromo = localStorage.getItem('promoCode');
     const savedDiscount = localStorage.getItem('discountPercent');
     
-    if (savedCart) {
+    if (serverCart) {
+      setItems(JSON.parse(serverCart));
+    } else if (savedCart) {
       setItems(JSON.parse(savedCart));
     }
     if (savedPromo) {
@@ -37,6 +40,7 @@ export const CartProvider = ({ children }) => {
   // Сохранение корзины в localStorage при изменении
   useEffect(() => {
     localStorage.setItem('cart', JSON.stringify(items));
+    localStorage.setItem('sp_cart_server', JSON.stringify(items));
   }, [items]);
 
   // Добавление товара в корзину
@@ -108,10 +112,7 @@ export const CartProvider = ({ children }) => {
   };
 
   // Расчёт подитога (без налогов и скидок)
-  const subtotal = items.reduce((sum, item) => {
-    const price = parseFloat(item.price.replace(/\D/g, '')) || 0;
-    return sum + (price * item.quantity);
-  }, 0);
+  const subtotal = items.reduce((sum, item) => sum + (Number(item.price) || 0) * item.quantity, 0);
 
   // Налог (8% в Казахстане для стандартных товаров)
   const taxRate = 0.08;

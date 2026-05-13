@@ -12,6 +12,29 @@ html {
   scroll-behavior: smooth;
 }
 
+:root {
+  --sp-primary: #00f2ff;
+  --sp-secondary: #7000ff;
+  --sp-bg: #0a0a0c;
+  --sp-surface: #0f0f12;
+  --sp-surface-2: #15151b;
+  --sp-text: #f5f7ff;
+  --sp-muted: #a7b0c2;
+  --sp-border: rgba(255, 255, 255, 0.08);
+  --sp-success: #10b981;
+  --sp-warning: #f59e0b;
+  --sp-danger: #ef4444;
+}
+
+html[data-theme='light'] {
+  --sp-bg: #ffffff;
+  --sp-surface: #f7f8fb;
+  --sp-surface-2: #ffffff;
+  --sp-text: #0b0f1c;
+  --sp-muted: #4b5565;
+  --sp-border: rgba(10, 15, 28, 0.12);
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -19,8 +42,8 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #0a0e27;
-  color: #ffffff;
+  background: var(--sp-bg);
+  color: var(--sp-text);
 }
 
 #root {
@@ -50,4 +73,62 @@ code {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 200, 255, 0.5);
+}
+
+.sp-hero-enter {
+  animation: spHeroFade 900ms ease both;
+}
+
+.sp-hero-title {
+  animation: spHeroSlide 900ms ease both;
+}
+
+.sp-hero-sub {
+  animation: spHeroFade 900ms ease both;
+  animation-delay: 120ms;
+}
+
+@keyframes spHeroFade {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes spHeroSlide {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sp-ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.sp-ripple::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.35) 10%, transparent 10.01%);
+  background-repeat: no-repeat;
+  background-position: 50% 50%;
+  transform: scale(10);
+  opacity: 0;
+  transition: transform 0.5s, opacity 1s;
+}
+
+.sp-ripple:active::after {
+  transform: scale(0);
+  opacity: 0.6;
+  transition: 0s;
 }

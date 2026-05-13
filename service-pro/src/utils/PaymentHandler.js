@@ -271,7 +271,7 @@ export const getPaymentStatus = async (transactionId) => {
 };
 
 // Export для использования
-export default {
+const paymentHandler = {
   processPayment,
   generateKaspiQRCode,
   generateHalykQRCode,
@@ -282,3 +282,5 @@ export default {
   PAYMENT_METHODS,
   PAYMENT_STATUS
 };
+
+export default paymentHandler;

@@ -1,14 +1,28 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, CheckCircle, Loader } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import KaspiQRPayment from '../components/payments/KaspiQRPayment';
 import HalykQRPayment from '../components/payments/HalykQRPayment';
 import BankCardPayment from '../components/payments/BankCardPayment';
+import ServiceCenterModal from '../components/ServiceCenterModal';
+import LoginModal from '../components/LoginModal';
 import { processPayment, saveOrderWithPayment } from '../utils/PaymentHandler';
+import { createOrder } from '../utils/orderService';
+import { formatPrice } from '../utils/format';
+import serviceCenters from '../data/serviceCenters';
+import profileService from '../utils/profileService';
+import ConsentGate from '../components/ConsentGate';
+import { getDeliveryEstimate } from '../utils/deliveryEstimate';
 
-const Checkout = ({ isDark, t }) => {
+const Checkout = ({ isDark }) => {
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
   const { items, total, tax, subtotal, discount, promoCode, clearCart } = useCart();
 
   // Шаги оформления заказа
@@ -23,6 +37,11 @@ const Checkout = ({ isDark, t }) => {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('kaspi_qr');
   const [isProcessing, setIsProcessing] = useState(false);
   const [orderError, setOrderError] = useState('');
+  const [serviceCenterOpen, setServiceCenterOpen] = useState(false);
+  const [selectedServiceCenter, setSelectedServiceCenter] = useState(location.state?.preselectedCenterId || '');
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [deliveryConsent, setDeliveryConsent] = useState(false);
+  const [paymentConsent, setPaymentConsent] = useState(false);
 
   // Форма доставки
   const [deliveryData, setDeliveryData] = useState({
@@ -38,33 +57,57 @@ const Checkout = ({ isDark, t }) => {
   // Данные успешного заказа
   const [successData, setSuccessData] = useState(null);
 
+  useEffect(() => {
+    if (location.state?.preselectedCenterId) {
+      setSelectedServiceCenter(location.state.preselectedCenterId);
+    }
+  }, [location.state]);
+
   // Валидация данных доставки
   const validateDeliveryData = () => {
     if (!deliveryData.fullName.trim()) {
-      setOrderError('Укажите ФИО');
+      setOrderError(t('validation.required'));
       return false;
     }
-    if (!deliveryData.phone.match(/^\+?[0-9]{10,12}$/)) {
-      setOrderError('Укажите корректный номер телефона');
+    if (!deliveryData.phone.match(/^\+?[1-9]\d{9,14}$/)) {
+      setOrderError(t('validation.phone'));
       return false;
     }
     if (!deliveryData.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-      setOrderError('Укажите корректный email');
+      setOrderError(t('validation.email'));
       return false;
     }
     if (!deliveryData.address.trim() && deliveryData.deliveryMethod === 'courier') {
-      setOrderError('Укажите адрес доставки');
+      setOrderError(t('validation.required'));
       return false;
     }
     return true;
   };
 
+  const deliveryEstimate = deliveryData.deliveryMethod === 'courier'
+    ? getDeliveryEstimate({ placedAt: new Date(), locale: i18n.language || 'en' })
+    : null;
+
   // Обработка платежа
   const handlePaymentSuccess = async (paymentData) => {
+    if (!user) {
+      setLoginOpen(true);
+      return;
+    }
+    if (!selectedServiceCenter) {
+      setOrderError(t('validation.required'));
+      setServiceCenterOpen(true);
+      return;
+    }
     setIsProcessing(true);
     setOrderError('');
 
     try {
+      profileService.mergeProfileFromSubmission(user?.id, {
+        name: deliveryData.fullName,
+        phone: deliveryData.phone,
+        address: deliveryData.deliveryMethod === 'courier' ? deliveryData.address : deliveryData.city
+      });
       // Обработка платежа
       const paymentResult = await processPayment(paymentData, {
         items,
@@ -81,10 +124,14 @@ const Checkout = ({ isDark, t }) => {
         promoCode,
         total,
         payment: paymentResult,
-        delivery: deliveryData
+        delivery: deliveryData,
+        serviceCenterId: selectedServiceCenter,
+        serviceCenter: serviceCenters.find((center) => center.id === selectedServiceCenter) || null,
+        clientId: user?.id || 'guest'
       });
 
-      setSuccessData(orderResult);
+      const savedOrder = await createOrder(orderResult);
+      setSuccessData(savedOrder);
       setCurrentStep(STEPS.SUCCESS);
       clearCart();
     } catch (error) {
@@ -108,12 +155,12 @@ const Checkout = ({ isDark, t }) => {
             className="flex items-center gap-2 text-[#00f2ff] hover:opacity-70 transition-opacity mb-8"
           >
             <ArrowLeft size={20} />
-            Вернуться в магазин
+            {t('product.backToMarket')}
           </button>
           <div className="text-center py-20">
-            <h1 className="text-4xl font-black mb-4">Корзина пуста</h1>
+            <h1 className="text-4xl font-black mb-4">{t('checkout.emptyCart')}</h1>
             <p className={`text-lg mb-8 ${isDark ? 'text-white/70' : 'text-black/70'}`}>
-              Добавьте товары перед оформлением заказа
+              {t('market.addToCart')}
             </p>
           </div>
         </div>
@@ -133,19 +180,19 @@ const Checkout = ({ isDark, t }) => {
             <ArrowLeft size={20} />
             {currentStep === STEPS.CART_REVIEW ? 'В магазин' : 'Назад'}
           </button>
-          <h1 className="text-4xl font-black mb-2">Оформление заказа</h1>
+          <h1 className="text-4xl font-black mb-2">{t('checkout.title')}</h1>
           <p className={isDark ? 'text-white/50' : 'text-black/50'}>
-            Шаг {Object.values(STEPS).indexOf(currentStep) + 1} из {Object.keys(STEPS).length}
+            {t('repair.step')} {Object.values(STEPS).indexOf(currentStep) + 1} {t('repair.of')} {Object.keys(STEPS).length}
           </p>
         </div>
 
         {/* Progress Steps */}
         <div className="grid grid-cols-4 gap-2 mb-12">
           {[
-            { key: STEPS.CART_REVIEW, label: 'Корзина', icon: '1' },
-            { key: STEPS.DELIVERY_INFO, label: 'Доставка', icon: '2' },
-            { key: STEPS.PAYMENT, label: 'Оплата', icon: '3' },
-            { key: STEPS.SUCCESS, label: 'Успех', icon: '✓' }
+            { key: STEPS.CART_REVIEW, label: t('checkout.cartReview'), icon: '1' },
+            { key: STEPS.DELIVERY_INFO, label: t('checkout.deliveryInfo'), icon: '2' },
+            { key: STEPS.PAYMENT, label: t('checkout.payment'), icon: '3' },
+            { key: STEPS.SUCCESS, label: t('checkout.success'), icon: '4' }
           ].map((step, index) => (
             <div
               key={step.key}
@@ -189,8 +236,8 @@ const Checkout = ({ isDark, t }) => {
           <div className="lg:col-span-2">
             {/* Step 1: Cart Review */}
             {currentStep === STEPS.CART_REVIEW && (
-              <div className={`rounded-2xl border p-6 ${isDark ? 'border-white/10 bg-white/5' : 'border-black/10 bg-black/2'}`}>
-                <h2 className="text-2xl font-black mb-6">Проверка корзины</h2>
+              <div className={`rounded-2xl border p-6 ${isDark ? 'border-white/10 bg-white/5' : 'border-black/10 bg-black/5'}`}>
+                <h2 className="text-2xl font-black mb-6">{t('checkout.cartReview')}</h2>
                 <div className="space-y-4 mb-6">
                   {items.map(item => (
                     <div
@@ -202,13 +249,13 @@ const Checkout = ({ isDark, t }) => {
                       <div>
                         <h3 className="font-black">{item.name}</h3>
                         <p className={`text-sm ${isDark ? 'text-white/50' : 'text-black/50'}`}>
-                          Количество: {item.quantity}
+                          {t('checkout.quantity')}: {item.quantity}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-black text-[#00f2ff]">{item.price}</p>
+                        <p className="font-black text-primary">{formatPrice(item.price)}</p>
                         <p className={`text-sm ${isDark ? 'text-white/50' : 'text-black/50'}`}>
-                          {(parseFloat(item.price.replace(/\D/g, '')) * item.quantity).toLocaleString('ru-RU')} ₸
+                          {formatPrice((Number(item.price) || 0) * item.quantity)}
                         </p>
                       </div>
                     </div>
@@ -216,23 +263,29 @@ const Checkout = ({ isDark, t }) => {
                 </div>
 
                 <button
-                  onClick={() => setCurrentStep(STEPS.DELIVERY_INFO)}
+                  onClick={() => {
+                    if (!user) {
+                      setLoginOpen(true);
+                      return;
+                    }
+                    setCurrentStep(STEPS.DELIVERY_INFO);
+                  }}
                   className="w-full py-3 bg-gradient-to-r from-[#00f2ff] to-[#7000ff] text-black font-black rounded-xl hover:scale-105 transition-all"
                 >
-                  Далее: Доставка
+                  {t('checkout.deliveryInfo')}
                 </button>
               </div>
             )}
 
             {/* Step 2: Delivery Info */}
             {currentStep === STEPS.DELIVERY_INFO && (
-              <div className={`rounded-2xl border p-6 ${isDark ? 'border-white/10 bg-white/5' : 'border-black/10 bg-black/2'}`}>
-                <h2 className="text-2xl font-black mb-6">Данные доставки</h2>
+              <div className={`rounded-2xl border p-6 ${isDark ? 'border-white/10 bg-white/5' : 'border-black/10 bg-black/5'}`}>
+                <h2 className="text-2xl font-black mb-6">{t('checkout.deliveryInfo')}</h2>
 
                 <div className="space-y-4 mb-6">
                   <div>
                     <label className={`block font-bold mb-2 ${isDark ? 'text-white/70' : 'text-black/70'}`}>
-                      ФИО
+                      {t('repair.name')}
                     </label>
                     <input
                       type="text"
@@ -250,7 +303,7 @@ const Checkout = ({ isDark, t }) => {
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div>
                       <label className={`block font-bold mb-2 ${isDark ? 'text-white/70' : 'text-black/70'}`}>
-                        Телефон
+                        {t('repair.phone')}
                       </label>
                       <input
                         type="tel"
@@ -267,7 +320,7 @@ const Checkout = ({ isDark, t }) => {
 
                     <div>
                       <label className={`block font-bold mb-2 ${isDark ? 'text-white/70' : 'text-black/70'}`}>
-                        Email
+                        {t('auth.email')}
                       </label>
                       <input
                         type="email"
@@ -285,7 +338,7 @@ const Checkout = ({ isDark, t }) => {
 
                   <div>
                     <label className={`block font-bold mb-2 ${isDark ? 'text-white/70' : 'text-black/70'}`}>
-                      Город
+                      {t('checkout.city')}
                     </label>
                     <select
                       value={deliveryData.city}
@@ -306,12 +359,36 @@ const Checkout = ({ isDark, t }) => {
 
                   <div>
                     <label className={`block font-bold mb-2 ${isDark ? 'text-white/70' : 'text-black/70'}`}>
-                      Тип доставки
+                      {t('checkout.serviceCenter')}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setServiceCenterOpen(true)}
+                      className={`w-full px-4 py-3 rounded-lg border transition-all text-left ${
+                        selectedServiceCenter
+                          ? 'border-[#00f2ff] bg-[#00f2ff]/10'
+                          : isDark
+                          ? 'bg-[#0f0f12] border-white/10 hover:border-white/20'
+                          : 'bg-white border-black/10 hover:border-black/20'
+                      }`}
+                    >
+                      <p className="font-black">
+                        {serviceCenters.find((center) => center.id === selectedServiceCenter)?.name || t('common.select')}
+                      </p>
+                      <p className={`text-sm ${isDark ? 'text-white/50' : 'text-black/50'}`}>
+                        {serviceCenters.find((center) => center.id === selectedServiceCenter)?.address || t('validation.required')}
+                      </p>
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className={`block font-bold mb-2 ${isDark ? 'text-white/70' : 'text-black/70'}`}>
+                      {t('checkout.deliveryMethod')}
                     </label>
                     <div className="grid sm:grid-cols-2 gap-4">
                       {[
-                        { value: 'pickup', label: 'Самовывоз', desc: 'Бесплатно' },
-                        { value: 'courier', label: 'Курьер', desc: '1000 ₸' }
+                        { value: 'pickup', label: t('checkout.pickup'), desc: 'Free' },
+                        { value: 'courier', label: t('checkout.courier'), desc: '1000 ₸' }
                       ].map(option => (
                         <button
                           key={option.value}
@@ -331,10 +408,23 @@ const Checkout = ({ isDark, t }) => {
                     </div>
                   </div>
 
+                  {deliveryEstimate && (
+                    <div className={`p-4 rounded-xl border ${isDark ? 'bg-white/5 border-white/10 text-white/80' : 'bg-white border-black/10 text-black/80'}`}>
+                      <p className="text-xs font-black uppercase opacity-60 mb-1">{t('checkout.delivery')}</p>
+                      <p className="font-black">
+                        {deliveryEstimate.mode === 'today'
+                          ? t('checkout.etaToday')
+                          : deliveryEstimate.mode === 'tomorrow'
+                          ? t('checkout.etaTomorrow')
+                          : deliveryEstimate.label}
+                      </p>
+                    </div>
+                  )}
+
                   {deliveryData.deliveryMethod === 'courier' && (
                     <div>
                       <label className={`block font-bold mb-2 ${isDark ? 'text-white/70' : 'text-black/70'}`}>
-                        Адрес доставки
+                        {t('checkout.address')}
                       </label>
                       <input
                         type="text"
@@ -366,33 +456,58 @@ const Checkout = ({ isDark, t }) => {
                         : 'bg-black/5 hover:bg-black/10'
                     }`}
                   >
-                    Назад
+                    {t('common.back')}
                   </button>
                   <button
                     onClick={() => {
                       setOrderError('');
+                      if (!user) {
+                        setLoginOpen(true);
+                        return;
+                      }
+                      if (!selectedServiceCenter) {
+                        setOrderError(t('validation.required'));
+                        setServiceCenterOpen(true);
+                        return;
+                      }
+                      if (!deliveryConsent) {
+                        setOrderError(t('validation.privacyConsent'));
+                        return;
+                      }
                       if (validateDeliveryData()) {
                         setCurrentStep(STEPS.PAYMENT);
                       }
                     }}
-                    className="flex-1 py-3 bg-gradient-to-r from-[#00f2ff] to-[#7000ff] text-black font-black rounded-xl hover:scale-105 transition-all"
+                    disabled={!deliveryConsent}
+                    className="flex-1 py-3 bg-gradient-to-r from-[#00f2ff] to-[#7000ff] text-black font-black rounded-xl hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Далее: Оплата
+                    {t('checkout.payment')}
                   </button>
+                </div>
+
+                <div className="mt-4">
+                  <ConsentGate
+                    checked={deliveryConsent}
+                    onChange={setDeliveryConsent}
+                    text={t('checkout.consent')}
+                    policyLabel={t('common.privacyPolicy')}
+                    policyUrl={process.env.REACT_APP_PRIVACY_POLICY_URL}
+                    isDark={isDark}
+                  />
                 </div>
               </div>
             )}
 
             {/* Step 3: Payment */}
             {currentStep === STEPS.PAYMENT && (
-              <div className={`rounded-2xl border p-6 ${isDark ? 'border-white/10 bg-white/5' : 'border-black/10 bg-black/2'}`}>
-                <h2 className="text-2xl font-black mb-6">Выберите способ оплаты</h2>
+              <div className={`rounded-2xl border p-6 ${isDark ? 'border-white/10 bg-white/5' : 'border-black/10 bg-black/5'}`}>
+                <h2 className="text-2xl font-black mb-6">{t('checkout.payment')}</h2>
 
                 <div className="space-y-6 mb-8">
                   {[
-                    { value: 'kaspi_qr', label: 'Kaspi QR', desc: 'Быстрая оплата через Kaspi' },
-                    { value: 'halyk_qr', label: 'Halyk QR', desc: 'Платёж через Halyk Bank' },
-                    { value: 'bank_card', label: 'Банковская карта', desc: 'Visa, Mastercard' }
+                    { value: 'kaspi_qr', label: 'Kaspi QR', desc: 'Kaspi App' },
+                    { value: 'halyk_qr', label: 'Halyk QR', desc: 'Halyk Bank' },
+                    { value: 'bank_card', label: 'Bank card', desc: 'Visa, Mastercard' }
                   ].map(method => (
                     <button
                       key={method.value}
@@ -422,6 +537,8 @@ const Checkout = ({ isDark, t }) => {
                       amount={total}
                       onPaymentSuccess={handlePaymentSuccess}
                       onPaymentError={handlePaymentError}
+                      consentChecked={paymentConsent}
+                      onConsentChange={setPaymentConsent}
                     />
                   )}
                   {selectedPaymentMethod === 'halyk_qr' && (
@@ -430,6 +547,8 @@ const Checkout = ({ isDark, t }) => {
                       amount={total}
                       onPaymentSuccess={handlePaymentSuccess}
                       onPaymentError={handlePaymentError}
+                      consentChecked={paymentConsent}
+                      onConsentChange={setPaymentConsent}
                     />
                   )}
                   {selectedPaymentMethod === 'bank_card' && (
@@ -438,8 +557,28 @@ const Checkout = ({ isDark, t }) => {
                       amount={total}
                       onPaymentSuccess={handlePaymentSuccess}
                       onPaymentError={handlePaymentError}
+                      consentChecked={paymentConsent}
+                      onConsentChange={setPaymentConsent}
                     />
                   )}
+                </div>
+
+                <div className={`mb-6 p-4 rounded-xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-white border-black/10'}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black uppercase opacity-60">{t('checkout.serviceCenter')}</p>
+                      <p className="font-black mt-1">
+                        {serviceCenters.find((center) => center.id === selectedServiceCenter)?.name || t('validation.required')}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setServiceCenterOpen(true)}
+                      className="px-4 py-2 rounded-xl font-black uppercase text-xs bg-primary text-black"
+                    >
+                      {t('common.select')}
+                    </button>
+                  </div>
                 </div>
 
                 {orderError && (
@@ -451,7 +590,7 @@ const Checkout = ({ isDark, t }) => {
                 {isProcessing && (
                   <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-500 flex items-center gap-2">
                     <Loader size={18} className="animate-spin" />
-                    <span>Обрабатываем платёж...</span>
+                    <span>{t('common.loading')}...</span>
                   </div>
                 )}
               </div>
@@ -466,16 +605,16 @@ const Checkout = ({ isDark, t }) => {
                   </div>
                 </div>
 
-                <h2 className="text-4xl font-black mb-2 text-emerald-500">Заказ принят!</h2>
+                <h2 className="text-4xl font-black mb-2 text-emerald-500">{t('checkout.orderAccepted')}</h2>
                 <p className={`text-lg mb-8 ${isDark ? 'text-white/70' : 'text-black/70'}`}>
-                  Спасибо за покупку. Ваш заказ успешно создан.
+                  {t('checkout.success')}
                 </p>
 
                 <div className={`p-6 rounded-lg mb-8 ${isDark ? 'bg-white/5' : 'bg-black/5'}`}>
-                  <p className={`text-sm mb-2 ${isDark ? 'text-white/50' : 'text-black/50'}`}>ID заказа</p>
+                  <p className={`text-sm mb-2 ${isDark ? 'text-white/50' : 'text-black/50'}`}>ID</p>
                   <p className="font-black text-xl">{successData.orderId}</p>
                   <p className={`text-xs mt-4 ${isDark ? 'text-white/50' : 'text-black/50'}`}>
-                    Ожидаемая доставка: {new Date(successData.estimatedDelivery).toLocaleDateString('ru-RU')}
+                    ETA: {new Date(successData.estimatedDelivery).toLocaleDateString('ru-RU')}
                   </p>
                 </div>
 
@@ -484,7 +623,7 @@ const Checkout = ({ isDark, t }) => {
                     onClick={() => navigate('/market')}
                     className="w-full py-3 bg-gradient-to-r from-[#00f2ff] to-[#7000ff] text-black font-black rounded-xl hover:scale-105 transition-all"
                   >
-                    Продолжить покупки
+                    {t('checkout.continueShopping')}
                   </button>
                   <button
                     onClick={() => navigate('/')}
@@ -494,7 +633,7 @@ const Checkout = ({ isDark, t }) => {
                         : 'bg-black/5 hover:bg-black/10'
                     }`}
                   >
-                    На главную
+                    {t('common.home')}
                   </button>
                 </div>
               </div>
@@ -503,40 +642,40 @@ const Checkout = ({ isDark, t }) => {
 
           {/* Summary Sidebar */}
           <div className={`rounded-2xl border p-6 h-fit sticky top-4 ${
-            isDark ? 'border-white/10 bg-white/5' : 'border-black/10 bg-black/2'
+            isDark ? 'border-white/10 bg-white/5' : 'border-black/10 bg-black/5'
           }`}>
             <h3 className="font-black text-lg mb-6">Итоги</h3>
 
             <div className="space-y-3 mb-6 pb-6 border-b border-white/10">
               <div className="flex justify-between text-sm">
-                <span className={isDark ? 'text-white/70' : 'text-black/70'}>Подитого:</span>
-                <span className="font-bold">{subtotal.toLocaleString('ru-RU')} ₸</span>
+                <span className={isDark ? 'text-white/70' : 'text-black/70'}>{t('checkout.subtotal')}:</span>
+                <span className="font-bold">{formatPrice(subtotal)}</span>
               </div>
 
               <div className="flex justify-between text-sm">
-                <span className={isDark ? 'text-white/70' : 'text-black/70'}>Налог (8%):</span>
-                <span className="font-bold">{tax.toLocaleString('ru-RU')} ₸</span>
+                <span className={isDark ? 'text-white/70' : 'text-black/70'}>{t('checkout.tax')} (8%):</span>
+                <span className="font-bold">{formatPrice(tax)}</span>
               </div>
 
               {discount > 0 && (
                 <div className="flex justify-between text-sm text-emerald-500 font-bold">
                   <span>Скидка ({promoCode}):</span>
-                  <span>-{discount.toLocaleString('ru-RU')} ₸</span>
+                  <span>-{formatPrice(discount)}</span>
                 </div>
               )}
 
               {deliveryData.deliveryMethod === 'courier' && (
                 <div className="flex justify-between text-sm">
-                  <span className={isDark ? 'text-white/70' : 'text-black/70'}>Доставка:</span>
-                  <span className="font-bold">1 000 ₸</span>
+                  <span className={isDark ? 'text-white/70' : 'text-black/70'}>{t('checkout.delivery')}:</span>
+                  <span className="font-bold">{formatPrice(1000)}</span>
                 </div>
               )}
             </div>
 
             <div className="flex justify-between font-black text-lg mb-6">
-              <span>Итого:</span>
-              <span className="text-[#00f2ff]">
-                {(total + (deliveryData.deliveryMethod === 'courier' ? 1000 : 0)).toLocaleString('ru-RU')} ₸
+              <span>{t('checkout.total')}:</span>
+              <span className="text-primary">
+                {formatPrice(total + (deliveryData.deliveryMethod === 'courier' ? 1000 : 0))}
               </span>
             </div>
 
@@ -551,6 +690,30 @@ const Checkout = ({ isDark, t }) => {
           </div>
         </div>
       </div>
+
+      <ServiceCenterModal
+        isOpen={serviceCenterOpen}
+        onClose={() => setServiceCenterOpen(false)}
+        onConfirm={(centerId) => {
+          setSelectedServiceCenter(centerId);
+          setOrderError('');
+          setServiceCenterOpen(false);
+        }}
+        centers={serviceCenters.filter((center) => center.city === 'Astana')}
+        initialCenterId={selectedServiceCenter}
+        isDark={isDark}
+        title={t('checkout.serviceCenter')}
+        confirmLabel={t('common.confirmSelection')}
+        nearestLabel={t('common.nearestToYou')}
+        selectLabel={t('common.select')}
+        distanceLabel={t('common.kmAway')}
+      />
+      <LoginModal
+        isOpen={loginOpen}
+        onClose={() => setLoginOpen(false)}
+        isDark={isDark}
+        title={t('auth.signIn')}
+      />
     </div>
   );
 };
